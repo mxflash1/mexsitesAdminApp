@@ -92,3 +92,7 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
+# Firebase/Google Services - Contains sensitive API keys
+**/GoogleService-Info.plist
+GoogleService-Info.plist
+
