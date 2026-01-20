@@ -23,13 +23,13 @@ struct ContentView: View {
                 
                 // Content Area
                 TabView(selection: $selectedTab) {
-                    CalendarView()
+                    PaymentsView()
                         .tag(0)
                     
                     HoursView()
                         .tag(1)
                     
-                    PaymentsView()
+                    CalendarView()
                         .tag(2)
                     
                     ClientsView()
@@ -49,18 +49,18 @@ struct ContentView: View {
 struct PixelTabBar: View {
     @Binding var selectedTab: Int
     
-    let tabs: [(icon: String, label: String)] = [
-        ("📅", "CALENDAR"),
-        ("⏰", "HOURS"),
-        ("💰", "PAYMENTS"),
-        ("👥", "CLIENTS")
+    let tabs: [(iconName: String, label: String)] = [
+        ("PaymentsIcon", "PAYMENTS"),
+        ("HoursIcon", "HOURS"),
+        ("CalendarIcon", "CALENDAR"),
+        ("ClientsIcon", "CLIENTS")
     ]
     
     var body: some View {
         HStack(spacing: 0) {
             ForEach(0..<tabs.count, id: \.self) { index in
                 PixelTabItem(
-                    icon: tabs[index].icon,
+                    iconName: tabs[index].iconName,
                     label: tabs[index].label,
                     isSelected: selectedTab == index
                 )
@@ -82,14 +82,17 @@ struct PixelTabBar: View {
 }
 
 struct PixelTabItem: View {
-    let icon: String
+    let iconName: String
     let label: String
     let isSelected: Bool
     
     var body: some View {
         VStack(spacing: 4) {
-            Text(icon)
-                .font(.system(size: 24))
+            Image(iconName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 32, height: 32)
+                .opacity(isSelected ? 1.0 : 0.7)
             
             Text(label)
                 .pixelFont(size: 9, weight: isSelected ? .bold : .regular)

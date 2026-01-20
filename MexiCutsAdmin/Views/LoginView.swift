@@ -19,22 +19,11 @@ struct LoginView: View {
             VStack(spacing: 0) {
                 Spacer()
                 
-                // Logo/Title Section
-                VStack(spacing: 16) {
-                    if firebase.currentClientName.isEmpty {
-                        Text("BOOKING")
-                            .pixelFont(size: 32, weight: .bold)
-                            .foregroundColor(PixelTheme.mexicanGreen)
-                    } else {
-                        Text(firebase.currentClientName.uppercased())
-                            .pixelFont(size: 28, weight: .bold)
-                            .foregroundColor(PixelTheme.mexicanGreen)
-                    }
-                    
-                    Text("ADMIN PANEL")
-                        .pixelFont(size: 16, weight: .bold)
-                        .foregroundColor(PixelTheme.mexicanRed)
-                }
+                // Logo Section - MEXI.SITES Logo
+                Image("MexiSitesLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 280, maxHeight: 200)
                 .padding(.bottom, 60)
                 
                 // Login Form
@@ -148,7 +137,7 @@ struct LoginView: View {
                 Spacer()
                 
                 // Footer
-                Text("MEXICUTS ADMIN v1.0")
+                Text("MEXI.SITES ADMIN v1.0")
                     .pixelFont(size: 9, weight: .regular)
                     .foregroundColor(PixelTheme.textGray)
                     .padding(.bottom, 24)

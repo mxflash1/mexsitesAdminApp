@@ -164,19 +164,12 @@ struct PixelLogoHeader: View {
         HStack {
             Spacer()
             
-            VStack(spacing: 8) {
-                // Logo placeholder - you can replace with actual image
-                HStack(spacing: 0) {
-                    Text("MEXI")
-                        .pixelFont(size: 20, weight: .bold)
-                        .foregroundColor(PixelTheme.mexicanGreen)
-                    Text(".")
-                        .pixelFont(size: 20, weight: .bold)
-                        .foregroundColor(PixelTheme.textGray)
-                    Text("CUTS")
-                        .pixelFont(size: 20, weight: .bold)
-                        .foregroundColor(PixelTheme.mexicanRed)
-                }
+            VStack(spacing: 2) {
+                // MEXI.CUTS Logo
+                Image("MexiCutsLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 200, maxHeight: 80)
                 
                 if showTitle {
                     Text("ADMIN PANEL")
@@ -191,8 +184,10 @@ struct PixelLogoHeader: View {
             // Logout Button
             Button(action: { firebase.logout() }) {
                 VStack(spacing: 2) {
-                    Text("🚪")
-                        .font(.system(size: 18))
+                    Image("LogoutIcon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 32, height: 32)
                     Text("LOGOUT")
                         .pixelFont(size: 8, weight: .regular)
                         .foregroundColor(PixelTheme.textGray)
