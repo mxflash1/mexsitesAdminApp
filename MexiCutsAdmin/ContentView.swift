@@ -23,13 +23,13 @@ struct ContentView: View {
                 
                 // Content Area
                 TabView(selection: $selectedTab) {
-                    PaymentsView()
+                    CalendarView()
                         .tag(0)
                     
                     HoursView()
                         .tag(1)
                     
-                    CalendarView()
+                    PaymentsView()
                         .tag(2)
                     
                     ClientsView()
@@ -50,9 +50,9 @@ struct PixelTabBar: View {
     @Binding var selectedTab: Int
     
     let tabs: [(iconName: String, label: String)] = [
-        ("PaymentsIcon", "PAYMENTS"),
-        ("HoursIcon", "HOURS"),
         ("CalendarIcon", "CALENDAR"),
+        ("HoursIcon", "HOURS"),
+        ("PaymentsIcon", "PAYMENTS"),
         ("ClientsIcon", "CLIENTS")
     ]
     
@@ -91,7 +91,7 @@ struct PixelTabItem: View {
             Image(iconName)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 32, height: 32)
+                .frame(width: 40, height: 40)
                 .opacity(isSelected ? 1.0 : 0.7)
             
             Text(label)

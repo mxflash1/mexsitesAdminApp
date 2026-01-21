@@ -89,9 +89,22 @@ class FirebaseManager: ObservableObject {
                 self?.bookings = documents.compactMap { doc -> Booking? in
                     let data = doc.data()
                     
+                    print("📋 Processing booking \(doc.documentID):")
+                    print("   - name: \(data["name"] as? String ?? "MISSING")")
+                    print("   - phone: \(data["phone"] as? String ?? "MISSING")")
+                    print("   - timeSlot: \(data["timeSlot"] as? String ?? "MISSING")")
+                    print("   - paymentStatus: \(data["paymentStatus"] as? String ?? "NOT SET")")
+                    
                     guard let name = data["name"] as? String,
                           let phone = data["phone"] as? String,
                           let timeSlot = data["timeSlot"] as? String else {
+                        print("❌ Skipping booking \(doc.documentID): missing required fields")
+                        return nil
+                    }
+                    
+                    // Parse date from timeSlot - skip booking if date is invalid
+                    guard let date = self?.parseTimeSlot(timeSlot) else {
+                        print("❌ Skipping booking \(doc.documentID) (\(name)): invalid timeSlot format '\(timeSlot)'")
                         return nil
                     }
                     
@@ -106,8 +119,12 @@ class FirebaseManager: ObservableObject {
                         paymentMethod = methodRaw == "cash" ? .cash : .card
                     }
                     
-                    // Parse date from timeSlot
-                    let date = self?.parseTimeSlot(timeSlot) ?? Date()
+                    let isPast = date < Date()
+                    print("   ✅ Booking loaded: \(name) - \(timeSlot)")
+                    print("   - Parsed date: \(date)")
+                    print("   - Is past? \(isPast)")
+                    print("   - Payment status: \(paymentStatusRaw)")
+                    print("   - Will show in pending? \(isPast && paymentStatus == .pending)")
                     
                     return Booking(
                         id: doc.documentID,
@@ -284,6 +301,16 @@ class FirebaseManager: ObservableObject {
     
     // MARK: - Payments
     
+    // Save payment method without marking as paid (Step 1)
+    func savePaymentMethod(bookingId: String, method: PaymentMethod) async throws {
+        try await db.collection("bookings").document(bookingId).updateData([
+            "paymentMethod": method == .cash ? "cash" : "card",
+            "paymentMethodSelectedAt": FieldValue.serverTimestamp()
+        ])
+        print("✅ Saved payment method (\(method.rawValue)) for: \(bookingId)")
+    }
+    
+    // Confirm payment as paid (Step 2)
     func confirmPayment(bookingId: String, method: PaymentMethod) async throws {
         // First check if booking is in payment sheet, if not add it
         let bookingDoc = try await db.collection("bookings").document(bookingId).getDocument()
@@ -300,10 +327,12 @@ class FirebaseManager: ObservableObject {
         }
         
         // Update Firestore
+        // Note: adminConfirmed flag tells backend NOT to send payment confirmation emails
         try await db.collection("bookings").document(bookingId).updateData([
             "paymentStatus": "paid",
             "paymentMethod": method == .cash ? "cash" : "card",
-            "paymentConfirmedAt": FieldValue.serverTimestamp()
+            "paymentConfirmedAt": FieldValue.serverTimestamp(),
+            "adminConfirmed": true  // Prevent backend from sending emails
         ])
         print("✅ Confirmed payment for: \(bookingId)")
         
@@ -337,7 +366,8 @@ class FirebaseManager: ObservableObject {
         try await db.collection("bookings").document(bookingId).updateData([
             "paymentStatus": "paid",
             "paymentMethod": "cash",
-            "paymentConfirmedAt": FieldValue.serverTimestamp()
+            "paymentConfirmedAt": FieldValue.serverTimestamp(),
+            "adminConfirmed": true  // Prevent backend from sending emails
         ])
         print("✅ Removed from pending: \(bookingId)")
     }
@@ -386,10 +416,13 @@ class FirebaseManager: ObservableObject {
     
     // MARK: - Helpers
     
-    private func parseTimeSlot(_ timeSlot: String) -> Date {
+    private func parseTimeSlot(_ timeSlot: String) -> Date? {
         // Format: "2025-12-08 10:00 AM"
         let parts = timeSlot.split(separator: " ")
-        guard parts.count >= 3 else { return Date() }
+        guard parts.count >= 3 else { 
+            print("⚠️ Invalid timeSlot format (not enough parts): '\(timeSlot)'")
+            return nil
+        }
         
         let datePart = String(parts[0])
         let timePart = String(parts[1])
@@ -397,12 +430,15 @@ class FirebaseManager: ObservableObject {
         
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd h:mm a"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Australia/Brisbane")  // Parse times as Brisbane timezone
         
         if let date = formatter.date(from: "\(datePart) \(timePart) \(ampm)") {
             return date
         }
         
-        return Date()
+        print("⚠️ Failed to parse timeSlot: '\(timeSlot)'")
+        return nil
     }
     
     private func setupDefaultHours() {
@@ -428,7 +464,16 @@ class FirebaseManager: ObservableObject {
     }
     
     var pendingPayments: [Booking] {
-        bookings.filter { $0.isPast && $0.paymentStatus == .pending }
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        
+        return bookings
+            .filter { booking in
+                // Show pending bookings from today or earlier
+                let isFromTodayOrPast = booking.date < Date() || calendar.isDateInToday(booking.date)
+                return isFromTodayOrPast && booking.paymentStatus == .pending
+            }
+            .sorted { $0.date < $1.date }  // Oldest to newest (chronological order)
     }
     
     var completedPayments: [Booking] {
@@ -436,7 +481,9 @@ class FirebaseManager: ObservableObject {
     }
     
     func bookingsForDate(_ date: Date) -> [Booking] {
-        bookings.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
+        bookings
+            .filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
+            .sorted { $0.date < $1.date }  // Sort chronologically (earliest to latest)
     }
     
     // MARK: - Payment Sync Helpers

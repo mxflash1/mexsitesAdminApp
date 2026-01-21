@@ -79,7 +79,7 @@ struct PaymentsView: View {
         .sheet(item: $selectedBooking) { booking in
             PixelPaymentMethodSheet(booking: booking)
                 .environmentObject(firebase)
-                .presentationDetents([.fraction(0.45), .medium])
+                .presentationDetents([.large, .fraction(0.75)])
                 .presentationDragIndicator(.visible)
         }
     }
@@ -183,6 +183,14 @@ struct PixelPaymentMethodSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingConfirmation = false
     @State private var selectedMethod: PaymentMethod?
+    @State private var isProcessing = false
+    @State private var isSavingMethod = false
+    
+    init(booking: Booking) {
+        self.booking = booking
+        // Initialize with existing payment method if already set
+        _selectedMethod = State(initialValue: booking.paymentMethod)
+    }
     
     var body: some View {
         ZStack {
@@ -197,7 +205,7 @@ struct PixelPaymentMethodSheet: View {
                     
                     Spacer()
                     
-                    Text("💰 CONFIRM PAYMENT")
+                    Text(selectedMethod == nil ? "💰 PAYMENT METHOD" : "✓ CONFIRM PAYMENT")
                         .pixelFont(size: 16, weight: .bold)
                         .foregroundColor(PixelTheme.mexicanGreen)
                     
@@ -239,49 +247,127 @@ struct PixelPaymentMethodSheet: View {
                         .frame(height: 2)
                         .padding(.horizontal, 16)
                     
-                    Text("HOW DID THEY PAY?")
+                    Text(selectedMethod == nil ? "STEP 1: HOW DID THEY PAY?" : "STEP 2: CONFIRM PAYMENT")
                         .pixelFont(size: 12, weight: .regular)
                         .foregroundColor(PixelTheme.textGray)
                     
-                    // Payment Method Buttons
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            selectedMethod = .cash
-                            confirmPayment()
-                        }) {
-                            HStack {
-                                Text("💵")
-                                    .font(.system(size: 24))
-                                Text("CASH")
-                                    .pixelFont(size: 16, weight: .bold)
-                                Spacer()
-                                Text("▶")
-                                    .pixelFont(size: 14, weight: .regular)
+                    if selectedMethod == nil {
+                        // Step 1: Select Payment Method
+                        VStack(spacing: 12) {
+                            Button(action: {
+                                savePaymentMethod(.cash)
+                            }) {
+                                HStack {
+                                    if isSavingMethod {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Text("💵")
+                                            .font(.system(size: 24))
+                                    }
+                                    Text("CASH")
+                                        .pixelFont(size: 16, weight: .bold)
+                                    Spacer()
+                                    if !isSavingMethod {
+                                        Text("▶")
+                                            .pixelFont(size: 14, weight: .regular)
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .padding(16)
+                                .background(PixelTheme.mexicanGreen)
                             }
-                            .foregroundColor(.white)
-                            .padding(16)
-                            .background(PixelTheme.mexicanGreen)
+                            .disabled(isSavingMethod)
+                            
+                            Button(action: {
+                                savePaymentMethod(.card)
+                            }) {
+                                HStack {
+                                    if isSavingMethod {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Text("💳")
+                                            .font(.system(size: 24))
+                                    }
+                                    Text("CARD")
+                                        .pixelFont(size: 16, weight: .bold)
+                                    Spacer()
+                                    if !isSavingMethod {
+                                        Text("▶")
+                                            .pixelFont(size: 14, weight: .regular)
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .padding(16)
+                                .background(.blue)
+                            }
+                            .disabled(isSavingMethod)
                         }
-                        
-                        Button(action: {
-                            selectedMethod = .card
-                            confirmPayment()
-                        }) {
-                            HStack {
-                                Text("💳")
-                                    .font(.system(size: 24))
-                                Text("CARD")
-                                    .pixelFont(size: 16, weight: .bold)
+                        .padding(.horizontal, 16)
+                    } else {
+                        // Step 2: Show selected method and confirm button
+                        VStack(spacing: 16) {
+                            // Show selected payment method
+                            HStack(spacing: 16) {
+                                Text(selectedMethod == .cash ? "💵" : "💳")
+                                    .font(.system(size: 32))
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("PAYMENT METHOD")
+                                        .pixelFont(size: 11, weight: .regular)
+                                        .foregroundColor(PixelTheme.textGray)
+                                    Text((selectedMethod?.rawValue ?? "").uppercased())
+                                        .pixelFont(size: 18, weight: .bold)
+                                        .foregroundColor(.white)
+                                }
+                                
                                 Spacer()
-                                Text("▶")
-                                    .pixelFont(size: 14, weight: .regular)
+                                
+                                Button(action: {
+                                    selectedMethod = nil
+                                }) {
+                                    Text("CHANGE")
+                                        .pixelFont(size: 12, weight: .bold)
+                                        .foregroundColor(PixelTheme.mexicanRed)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .overlay(
+                                            Rectangle()
+                                                .stroke(PixelTheme.mexicanRed, lineWidth: 2)
+                                        )
+                                }
+                                .disabled(isSavingMethod || isProcessing)
                             }
-                            .foregroundColor(.white)
                             .padding(16)
-                            .background(.blue)
+                            .background(PixelTheme.cardBackground)
+                            .pixelCard(borderColor: selectedMethod == .cash ? PixelTheme.mexicanGreen : .blue)
+                            .padding(.horizontal, 16)
+                            
+                            // Big confirm payment button
+                            Button(action: { confirmPayment() }) {
+                                HStack {
+                                    if isProcessing {
+                                        ProgressView()
+                                            .tint(.white)
+                                        Text("PROCESSING...")
+                                            .pixelFont(size: 16, weight: .bold)
+                                    } else {
+                                        Text("✓")
+                                            .pixelFont(size: 24, weight: .bold)
+                                        Text("MARK AS PAID")
+                                            .pixelFont(size: 16, weight: .bold)
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                                .background(PixelTheme.mexicanGreen)
+                            }
+                            .disabled(isProcessing)
+                            .padding(.horizontal, 16)
                         }
                     }
-                    .padding(.horizontal, 16)
                     
                     // Divider with more spacing
                     Rectangle()
@@ -308,6 +394,7 @@ struct PixelPaymentMethodSheet: View {
                                 .stroke(PixelTheme.mexicanRed, lineWidth: 2)
                         )
                     }
+                    .disabled(isProcessing)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                     
@@ -315,20 +402,87 @@ struct PixelPaymentMethodSheet: View {
                 }
                 .padding(.top, 24)
             }
+            
+            // Custom Pixel Success Overlay
+            if showingConfirmation {
+                Color.black.opacity(0.85)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        dismiss()
+                    }
+                
+                VStack(spacing: 24) {
+                    // Success Icon
+                    ZStack {
+                        Rectangle()
+                            .fill(PixelTheme.mexicanGreen)
+                            .frame(width: 80, height: 80)
+                        
+                        Text("✓")
+                            .pixelFont(size: 48, weight: .bold)
+                            .foregroundColor(.white)
+                    }
+                    .overlay(
+                        Rectangle()
+                            .stroke(PixelTheme.mexicanGreen.opacity(0.5), lineWidth: 3)
+                    )
+                    
+                    VStack(spacing: 12) {
+                        Text("PAYMENT CONFIRMED!")
+                            .pixelFont(size: 20, weight: .bold)
+                            .foregroundColor(PixelTheme.mexicanGreen)
+                        
+                        Text("\(booking.name.uppercased())")
+                            .pixelFont(size: 16, weight: .bold)
+                            .foregroundColor(.white)
+                        
+                        Text("$20 • \(selectedMethod?.rawValue.uppercased() ?? "")")
+                            .pixelFont(size: 14, weight: .regular)
+                            .foregroundColor(PixelTheme.textGray)
+                    }
+                    
+                    Button(action: { dismiss() }) {
+                        Text("DONE")
+                            .pixelFont(size: 16, weight: .bold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(PixelTheme.mexicanGreen)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 8)
+                }
+                .padding(32)
+                .background(PixelTheme.cardBackground)
+                .pixelCard(borderColor: PixelTheme.mexicanGreen)
+                .padding(.horizontal, 24)
+            }
         }
-        .alert("PAYMENT CONFIRMED! 💰", isPresented: $showingConfirmation) {
-            Button("OK") { dismiss() }
-        } message: {
-            Text("\(booking.name)'s $20 (\(selectedMethod?.rawValue ?? "")) recorded.")
+    }
+    
+    private func savePaymentMethod(_ method: PaymentMethod) {
+        isSavingMethod = true
+        
+        Task {
+            try? await firebase.savePaymentMethod(bookingId: booking.id, method: method)
+            await MainActor.run {
+                selectedMethod = method
+                isSavingMethod = false
+            }
         }
     }
     
     private func confirmPayment() {
         guard let method = selectedMethod else { return }
         
+        isProcessing = true
+        
         Task {
             try? await firebase.confirmPayment(bookingId: booking.id, method: method)
-            showingConfirmation = true
+            await MainActor.run {
+                isProcessing = false
+                showingConfirmation = true
+            }
         }
     }
     

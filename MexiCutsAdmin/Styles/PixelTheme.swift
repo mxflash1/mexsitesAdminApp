@@ -161,9 +161,8 @@ struct PixelLogoHeader: View {
     var showTitle: Bool = true
     
     var body: some View {
-        HStack {
-            Spacer()
-            
+        ZStack {
+            // Centered logo and text
             VStack(spacing: 2) {
                 // MEXI.CUTS Logo
                 Image("MexiCutsLogo")
@@ -179,20 +178,22 @@ struct PixelLogoHeader: View {
                 }
             }
             
-            Spacer()
-            
-            // Logout Button
-            Button(action: { firebase.logout() }) {
-                VStack(spacing: 2) {
-                    Image("LogoutIcon")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 32, height: 32)
-                    Text("LOGOUT")
-                        .pixelFont(size: 8, weight: .regular)
-                        .foregroundColor(PixelTheme.textGray)
+            // Logout Button (positioned on right)
+            HStack {
+                Spacer()
+                
+                Button(action: { firebase.logout() }) {
+                    VStack(spacing: 2) {
+                        Image("LogoutIcon")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 48, height: 48)
+                        Text("LOGOUT")
+                            .pixelFont(size: 8, weight: .regular)
+                            .foregroundColor(PixelTheme.textGray)
+                    }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
             }
         }
         .padding(.vertical, 12)
